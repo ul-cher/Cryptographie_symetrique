@@ -13,7 +13,7 @@ void xor_chiffrement(const unsigned char *msg, const unsigned char *key, size_t 
 
 // Fonction pour le chiffrement CBC 
 void cbc_chiffrement(unsigned char *message, size_t message_len, unsigned char *cle, const unsigned char *iv, unsigned char *message_chiffrer) {
-   // la longueur ajustée (pour que le message soit un multiple de TAILLE_BLOC)
+   // la longueur ajustée (pour le remplissage du message)
     size_t len_aligned = (message_len % TAILLE_BLOC == 0) ? message_len : message_len + (TAILLE_BLOC - message_len % TAILLE_BLOC);
     unsigned char bloc_precedent[TAILLE_BLOC];
 
@@ -52,11 +52,11 @@ void cbc_dechiffrement(unsigned char *message_chiffre, size_t message_len, unsig
         unsigned char bloc_dechiffre[TAILLE_BLOC];
         unsigned char bloc_intermediaire[TAILLE_BLOC];
 
-        // Sauvegarde du bloc chiffré courant pour mise à jour du bloc précédent
+        // sauvegarde du bloc chiffré courant pour mise à jour du bloc précédent
         unsigned char bloc_chiffre_courant[TAILLE_BLOC];
         memcpy(bloc_chiffre_courant, message_chiffre + offset, TAILLE_BLOC);
 
-        // Déchiffrement du bloc courant
+        // déchiffrement du bloc courant
         size_t key_len = strlen((const char *)cle);
         xor_chiffrement(message_chiffre + offset, cle, TAILLE_BLOC, key_len, bloc_intermediaire);
 
@@ -65,10 +65,10 @@ void cbc_dechiffrement(unsigned char *message_chiffre, size_t message_len, unsig
             bloc_dechiffre[i] = bloc_intermediaire[i] ^ bloc_precedent[i];
         }
 
-        // Copie du bloc déchiffré dans le tampon de sortie
+        // copie du bloc déchiffré dans le tampon de sortie
         memcpy(message_dechiffre + offset, bloc_dechiffre, TAILLE_BLOC);
 
-        // Mise à jour du bloc précédent avec le bloc chiffré courant
+        // ;ise à jour du bloc précédent avec le bloc chiffré courant
         memcpy(bloc_precedent, bloc_chiffre_courant, TAILLE_BLOC);
     }
 }
