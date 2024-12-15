@@ -1,0 +1,4 @@
+Debut de chiffrement CBC.
+Clé lue depuis le fichier 'key.txt'
+Déchiffrement CBC effectué avec succes.
+Processus terminé avec succès.
