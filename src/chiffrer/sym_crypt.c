@@ -32,11 +32,12 @@ void read_file(const char *nom_fichier, unsigned char **contenu, size_t *len_fil
         exit(EXIT_FAILURE);
     }
 
+    //dDéterminer la taille du fichier
     fseek(fichier, 0, SEEK_END);
     *len_file = ftell(fichier);
     rewind(fichier);
     
-    // allocation de la mémoire pour le fichier
+    // allouer de la mémoire pour le stocker le contenu du fichier
     *contenu = malloc(*len_file);
     if (!*contenu) {
         perror("Erreur lors d'allocation de mémoire");
@@ -57,6 +58,7 @@ void write_file(const char *nom_fichier, const unsigned char *contenu, size_t le
         exit(EXIT_FAILURE);
     }
     
+    //ecrire le contenu dqns le fichier
     fwrite(contenu, 1, len_file, fichier);
     fclose(fichier);
 }
@@ -69,12 +71,13 @@ int main(int argc, char *argv[]) {
     unsigned char *vecteur_init = NULL, *cle = NULL;
     size_t len_iv = 0, key_len = 0;
 
+    // analyse des options passées en ligne de commande
     int opt;
     while ((opt = getopt(argc, argv, "i:o:k:f:m:v:l:h")) != -1) {
         switch (opt) {
-            case 'i': input_file = optarg; break;
-            case 'o': output_file = optarg; break;
-            case 'k': key = optarg; break;
+            case 'i': input_file = optarg; break;  
+            case 'o': output_file = optarg; break; 
+            case 'k': key = optarg; break; 
             case 'f': key_file = optarg; break;
             case 'm': methode = optarg; break;
             case 'v': iv_file = optarg; break;
@@ -94,6 +97,7 @@ int main(int argc, char *argv[]) {
 
     if (log_flux) fprintf(log_flux, "Debut de chiffrement.\n");
 
+    // vérification des arguments requis
     if (!input_file || !output_file || (!key && !key_file) || (!key && !key_file && strcmp(methode, "mask") != 0) 
         || (!iv_file && strcmp(methode, "cbc-crypt") == 0) || (!iv_file && strcmp(methode, "cbc-decrypt") == 0)|| !methode) {
         fprintf(stderr, "Arguments manquants.\n");
@@ -102,10 +106,12 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    // lecture du fichier d'entrée
     unsigned char *input = NULL;
     size_t message_len = 0;
     read_file(input_file, &input, &message_len);
 
+    // allocation de mémoire pour la sortie
     unsigned char *output = malloc(message_len + TAILLE_BLOC);
     if (!output) {
         perror("Erreur lors d'allocation de mémoire pour le output");
@@ -115,6 +121,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    // lecture de la clé si fournie dans un fichier
     if (key_file) {
         read_file(key_file, &cle, &key_len);
         if (log_flux) fprintf(log_flux, "Clé lue depuis le fichier '%s'\n", key_file);
@@ -124,6 +131,7 @@ int main(int argc, char *argv[]) {
         if (log_flux) fprintf(log_flux, "Clé indiqué sur la ligne de commande\n");
     }
 
+    // lecture du vecteur d'initialisation IV pour le CBC
     if ((strcmp(methode, "cbc-crypt") == 0 || strcmp(methode, "cbc-decrypt") == 0) && iv_file) {
         size_t len_iv = 0;
         read_file(iv_file, &vecteur_init, &len_iv);
@@ -134,15 +142,19 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
         }
     }
-
+    
+    // exécution de la méthode choisie
     if (strcmp(methode, "xor") == 0) {
+        // XOR
         size_t key_len = strlen((const char *)cle);
         xor_chiffrement(input, cle, message_len, key_len, output);
         if (log_flux) fprintf(log_flux, "Chiffrement XOR effectué avec succes.\n");
     } else if (strcmp(methode, "cbc-crypt") == 0) {
+        // chiffrement CBC
         cbc_chiffrement(input, message_len, cle, vecteur_init, output);
         if (log_flux) fprintf(log_flux, "Chiffrement CBC effectué avec succes.\n");
     } else if (strcmp(methode, "cbc-decrypt") == 0) {
+        // dechiffrement CBC
         cbc_dechiffrement(input, message_len, cle, vecteur_init, output);
         if (log_flux) fprintf(log_flux, "Déchiffrement CBC effectué avec succes.\n");
     } else if (strcmp(methode, "mask") == 0) {
@@ -155,11 +167,15 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
         }
 
+        //générer le clé 
         gen_key(cle, message_len);
+        // Calcul de la longueur de la clé
         size_t key_len = strlen((const char *)cle);
         xor_chiffrement(input, cle, message_len, key_len, output);
+
         if (log_flux) fprintf(log_flux, "Chiffrement XOR effectué.\n");
-        save_key_to_file(key_file, cle); 
+        save_key_to_file("used_keys.txt", cle); 
+
         if (log_flux) fprintf(log_flux, "Écriture dans le fichier '%s' réussie, taille : %lu octets\n", key_file, (unsigned long)message_len);
     } else {
         fprintf(stderr, "Méthode inconnue.\n");
@@ -171,10 +187,12 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    // écriture du résultat dans le fichier de sortie
     write_file(output_file, output, message_len);
 
     if (log_flux) fprintf(log_flux, "Processus terminé avec succès.\n");
-
+    
+    // libération des ressources
     free(input);
     free(output);
     free(vecteur_init);
