@@ -4,7 +4,7 @@
 #include <errno.h>
 #include "chiffrer/cbc.h" // Inclure les implémentations CBC
 #include "chiffrer/xor.h" // Inclure les implémentations XOR
-#include "Partie3/break_code.h" //Inclure les implémentations de C1 C2 C3
+#include "crack/break_code.h" //Inclure les implémentations de C1 C2 C3
 
 #define MAX_KEY_LENGTH 256
 #define LOG_FILE "log_file.txt"
@@ -179,7 +179,7 @@ void dechiffrer(const char *in, const char *out, const char *cle, const char *me
     char commande[512];
 
     // path vers `sym_crypt`
-    const char *path_to_sym_crypt = "chiffrer\\sym_crypt.exe"; ;
+    const char *path_to_sym_crypt = "chiffrer/sym_crypt"; ;
 
     if (iv) {
         snprintf(commande, sizeof(commande), 
@@ -208,7 +208,7 @@ void cracker(const char *in, const char *out, const char * length, const char *d
     printf("Tentative de craquage : %s\n", in);
     log_message("Crackage lancé.");
     char command[512];
-    const char *path_to_break_code = "Partie3/break_code";
+    const char *path_to_break_code = "crack/break_code";
     snprintf(command, sizeof(command), "%s -i %s -d %s -k %s -m %s -l %s", path_to_break_code, in, dico, length, method, out);
     int ret = system(command);
     if (ret == -1) {
