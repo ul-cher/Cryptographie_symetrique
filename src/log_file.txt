@@ -1,1 +1,4 @@
-Clef générée avec succès.
+Chiffrement effectué avec succès.
+Déchiffrement effectué avec succès.
+R effectué avec succes.
+Processus terminé avec succès.

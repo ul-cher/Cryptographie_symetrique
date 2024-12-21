@@ -4,10 +4,12 @@
 #include <errno.h>
 #include "chiffrer/cbc.h" // Inclure les implémentations CBC
 #include "chiffrer/xor.h" // Inclure les implémentations XOR
+#include "Partie3/break_code.h" //Inclure les implémentations de C1 C2 C3
 
 #define MAX_KEY_LENGTH 256
 #define LOG_FILE "log_file.txt"
 #define KEY_FILE "keys.txt"
+#define USED_KEYS_FILE "chiffrer/used_keys.txt"
 
 FILE *log_file, *key_file;
 
@@ -31,26 +33,42 @@ void afficher_aide() {
 
 void lister_cles() {
     FILE *file = fopen(KEY_FILE, "r"); 
+    FILE *file_used_keys = fopen(USED_KEYS_FILE, "r");
+
     if (!file) {
-        perror("Erreur lors de l'ouverture du fichier des clés");
+        perror("Erreur lors de l'ouverture du fichier des clés.");
         return; 
+    }
+    if(!file_used_keys) {
+        perror("Erreur lors de l'ouverture du fichier des clés déjà utlisées.");
+        return;
     }
 
     //verifier si le fichier est vide
     fseek(file,0,SEEK_END);
     if(ftell(file)==0) {
-        printf("Aucune clé trouvée. \n"); 
-        return;
-    }
+        printf("Aucune clé disponible trouvée. \n");
+    } else printf("Clefs générées et disponibles: \n");
     rewind(file);
 
-    printf("Clefs disponibles: \n");
-    char buffer[MAX_KEY_LENGTH];
+    char buffer[MAX_KEY_LENGTH], buffer_used[MAX_KEY_LENGTH];
     while (fgets(buffer, sizeof(buffer), file)) {
         buffer[strcspn(buffer, "\n")] = '\0'; // Supprimer le saut de ligne
         printf("  %s\n", buffer);
     }
     fclose(file);
+
+    fseek(file_used_keys,0,SEEK_END);
+    if(ftell(file_used_keys)==0) {
+        printf("Aucune clé utilisée trouvée. \n"); 
+    } else printf("Clefs utilisées: \n");
+    rewind(file_used_keys);
+
+    while (fgets(buffer_used, sizeof(buffer_used), file_used_keys)) {
+        buffer_used[strcspn(buffer_used, "\n")] = '\0'; // Supprimer le saut de ligne
+        printf("  %s\n", buffer_used);
+    }
+    fclose(file_used_keys);
 }
 
 void generer_cle(int longueur) {
@@ -58,12 +76,14 @@ void generer_cle(int longueur) {
         printf("Longueur de clef invalide.\n");
         return;
     }
+
     //allouer dynamiquement un tableau pour la clé, +1 pour le caractère de fin '\0'
     unsigned char *key = (unsigned char *)malloc((longueur + 1) * sizeof(unsigned char));
     if (key == NULL) {
         printf("Échec de l'allocation de mémoire.\n");
         return;
     }
+
     // Générer une clé aléatoire
     gen_key(key, longueur);
     printf("Clef générée: %s\n", key);
@@ -147,6 +167,7 @@ void chiffrer(const char *in, const char *out, const char *cle, const char *meth
         perror("Erreur lors de l'exécution de sym_crypt");
         log_message("Erreur lors de l'exécution de sym_crypt.");
     } else {
+        save_key_to_file(USED_KEYS_FILE, cle);
         printf("Chiffrement terminé avec succès.\n");
         log_message("Chiffrement effectué avec succès.");
     }
@@ -183,10 +204,20 @@ void dechiffrer(const char *in, const char *out, const char *cle, const char *me
     }
 }
 
-void cracker(const char *in, const char *out, int length, const char *dico) {
+void cracker(const char *in, const char *out, const char * length, const char *dico, const char* method)  {
     printf("Tentative de craquage : %s\n", in);
     log_message("Crackage lancé.");
-    // Implémentation du craquage ici
+    char command[512];
+    const char *path_to_break_code = "Partie3/break_code";
+    snprintf(command, sizeof(command), "%s -i %s -d %s -k %s -m %s -l %s", path_to_break_code, in, dico, length, method, out);
+    int ret = system(command);
+    if (ret == -1) {
+        perror("Erreur lors de l'exécution de sym_crypt");
+        log_message("Erreur lors de l'exécution de sym_crypt.");
+    } else {
+        printf("Déchiffrement terminé avec succès.\n");
+        log_message("Déchiffrement effectué avec succès.");
+    }
 }
 
 int main() {
@@ -257,11 +288,12 @@ int main() {
             char *in = strtok(NULL, " ");
             char *out = strtok(NULL, " ");
             char *length = strtok(NULL, " ");
-            char *dico = strtok(NULL, " \n");
+            char *dico = strtok(NULL, " ");
+            char *method = strtok(NULL, " \n");
             if (in && out && length && dico) {
-                cracker(in, out, atoi(length), dico);
+                cracker(in, out, length, dico, method);
             } else {
-                printf("Usage: crack <in> <out> <length> <dico>\n");
+                printf("Usage: crack <in> <out> <length> <dico> <method>\n");
             }
         } else if (strcmp(cmd, "quit") == 0) {
             break;
