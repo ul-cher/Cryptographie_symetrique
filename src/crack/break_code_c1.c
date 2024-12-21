@@ -1,79 +1,122 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include "break_code_c1.h"
+#include "break_code.h"
 
- 
+#define MAX_CHARACTERS 62
+#define CHARSET "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-int estASCIIValide(char c){
-    return isprint(c);
-}
-
-void caractereValide(char clef[LONGUEUR_MAX_CLEF][MAX_CARACTERE_VALIDE],int longClef){
-    for(int i = 0; i< longClef;i++){
-        int j = 0;
-        for(char c ='0';c<='9';c++) 
-            clef[i][j++]=c;
-        for(char c ='A';c<='Z';c++) 
-            clef[i][j++]=c;
-        for(char c= 'a';c<='z';c++) 
-            clef[i][j++]=c;
-        clef[i][j] = '\0'; 
+void libererCles(int tailleCle, unsigned char** cles) {
+    if (cles) {
+        for (int i = 0; i < tailleCle; i++) {
+            free(cles[i]);
+        }
+        free(cles);
     }
 }
 
+void libererGenerateur(Generateur* genCle) {
+    if (genCle) {
+        libererCles(genCle->tailleCle, genCle->clesValide);
+        free(genCle->indice);
+        free(genCle);
+        genCle = NULL;
+    }
+}
+
+void supprimer_caractere(unsigned char *chaine, unsigned char caractere) {
+    int j = 0;
+    size_t len = strlen((const char*)chaine);
+    unsigned char temp[len + 1];
+    for (size_t i = 0; i < len; i++) {
+        if (chaine[i] != caractere) {
+            temp[j++] = chaine[i];
+        }
+    }
+    temp[j] = '\0';
+    strcpy((char*)chaine, (const char*)temp);
+}
+
+int iterateurNext(Generateur* genCle) {
+    int fin = 1;
+    for (int i = genCle->tailleCle-1; i >= 0; i--) {
+        if (genCle->indice[i] + 1 < (int)strlen((const char*)genCle->clesValide[i])) {
+            genCle->indice[i]++;
+            fin = 0;
+            break;
+        } else {
+            genCle->indice[i] = 0;
+        }
+    }
+    return fin;
+}
+
+void selectionnerCle(unsigned char* cle, Generateur* genCle) {
+    for (int i = 0; i < genCle->tailleCle; i++) {
+        cle[i] = genCle->clesValide[i][genCle->indice[i]];
+    }
+    cle[genCle->tailleCle] = '\0';
+    iterateurNext(genCle);
+}
+
+int verifierCharactere(unsigned char carCrypte, unsigned char carCle) {
+    unsigned char carDecode = carCrypte ^ carCle;
+    return isalnum(carDecode) || isspace(carDecode) || ispunct(carDecode);
+}
 
 
-void xor_cipher(unsigned char *msg, unsigned char *key, size_t msg_len, size_t key_len) {
+Generateur* break_code_c1(unsigned char* messageCode, int msg_len, int tailleCle) {
+    unsigned char** cles = malloc(sizeof(unsigned char*) * tailleCle);
+    if (cles == NULL) {
+        perror("Erreur d'allocation mémoire");
+        return NULL;
+    }
+
+    for (int i = 0; i < tailleCle; i++) {
+        cles[i] = malloc((MAX_CHARACTERS + 1) * sizeof(unsigned char));
+        if (cles[i] == NULL) {
+            perror("Erreur d'allocation mémoire");
+            libererCles(i, cles);
+            return NULL;
+        }
+        strcpy((char*)cles[i], CHARSET);
+    }
+
     for (size_t i = 0; i < msg_len; i++) {
-        msg[i] ^= key[i % key_len];
-    }
-}
-
-
-
-void recherchePossibleClef(char *msg,char clefPossible[LONGUEUR_MAX_CLEF][MAX_CARACTERE_VALIDE],char *clef,int pos,int longeurClef){
-    int longMsg =strlen(msg);
-    if(pos== longeurClef){
-        unsigned char msgTemporaire[longMsg+1];
-        strcpy((char *)msgTemporaire,msg);
-        xor_cipher(msgTemporaire,(unsigned char *)clef,longMsg,longeurClef);
-
-        int valide = 1;
-        for(int i = 0; i < longMsg; i++){
-            if(!estASCIIValide(msgTemporaire[i])){
-                valide = 0;
-                break;
+        int j = 0;
+        while (cles[i % tailleCle][j] != '\0') {
+            if (!verifierCharactere(messageCode[i], cles[i % tailleCle][j])) {
+                supprimer_caractere(cles[i % tailleCle], cles[i % tailleCle][j]);
+            } else {
+                j++;
             }
         }
-        if(valide){
-            printf("Cle valide trouvee : %s \n", clef);
-        }else{
-            printf("Cle : %s a produit un msg invalide \n", clef);
-        }
     }
-    int nbCandidats = strlen(clefPossible[pos]);
-    for(int i = 0;i<nbCandidats;i++){
-        clef[pos] =clefPossible[pos][i];
-        recherchePossibleClef(msg,clefPossible, clef,pos+1,longeurClef);
+
+    Generateur* generateurCle = malloc(sizeof(Generateur));
+    if (generateurCle == NULL) {
+        perror("Erreur d'allocation mémoire");
+        libererCles(tailleCle, cles);
+        return NULL;
     }
-}
 
+    generateurCle->clesValide = cles;
+    generateurCle->tailleCle = tailleCle;
 
-void break_code_c1(const char *msg,int longClefMax){
-    char clefPossible[LONGUEUR_MAX_CLEF][MAX_CARACTERE_VALIDE];
-    char clef[LONGUEUR_MAX_CLEF + 1] ={0}; 
-    for(int longClef =1;longClef<=longClefMax;longClef++){
-        caractereValide(clefPossible,longClef);
-        printf("Test pour une longueur de clef = %d:\n",longClef);
-        recherchePossibleClef((char *)msg,clefPossible,clef,0,longClef);
+    generateurCle->indice = malloc(sizeof(int) * tailleCle);
+    if (generateurCle->indice == NULL) {
+        perror("Erreur d'allocation mémoire");
+        libererCles(tailleCle, cles);
+        free(generateurCle);
+        return NULL;
     }
-}
+    memset(generateurCle->indice, 0, sizeof(int) * tailleCle);
 
-int main(void){
-    const char *msg ="s(/1& !"; 
-    int  longueurClefMax = 2; 
-    break_code_c1(msg,longueurClefMax);
+    generateurCle->nbTotal = 1;
+    for (int i = 0; i < tailleCle; i++) {
+        generateurCle->nbTotal *= strlen((const char*)cles[i]);
+    }
 
-    return 0;
+    return generateurCle;
 }
